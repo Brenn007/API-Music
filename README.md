@@ -3,7 +3,7 @@
 📦 Cloner le Projet
 1️⃣ Cloner le Dépôt Git
 # Cloner le repository
-git clone https://github.com/Brenn007/TASK-API.git
+git clone https://github.com/Brenn007/API-Music.git
 
 cd playlist-api
 

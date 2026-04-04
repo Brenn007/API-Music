@@ -56,7 +56,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Rafraîchir l\'access token' })
   @ApiResponse({ status: 200, description: 'Token rafraîchi avec succès' })
   @ApiResponse({ status: 401, description: 'Refresh token invalide' })
-  async refresh(@GetUser() user: User) {
-    return this.authService.refreshTokens(user);
+  async refresh(@GetUser() user: any) {
+    const { refreshTokenRaw, ...userData } = user;
+    return this.authService.refreshTokens(userData as User, refreshTokenRaw);
   }
 }

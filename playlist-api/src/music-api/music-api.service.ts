@@ -36,11 +36,10 @@ export class MusicApiService {
           disambiguation: artist.disambiguation,
         })),
       };
-    } catch (error) {
-      throw new HttpException(
-        'Erreur lors de la recherche d\'artiste',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+    } catch (error: any) {
+      const status = error.response?.status || HttpStatus.SERVICE_UNAVAILABLE;
+      const message = error.response?.data?.error || 'Erreur lors de la recherche d\'artiste';
+      throw new HttpException(message, status);
     }
   }
 
@@ -72,11 +71,10 @@ export class MusicApiService {
           length: recording.length ? Math.round(recording.length / 1000) : null,
         })),
       };
-    } catch (error) {
-      throw new HttpException(
-        'Erreur lors de la recherche d\'enregistrement',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+    } catch (error: any) {
+      const status = error.response?.status || HttpStatus.SERVICE_UNAVAILABLE;
+      const message = error.response?.data?.error || 'Erreur lors de la recherche d\'enregistrement';
+      throw new HttpException(message, status);
     }
   }
 }

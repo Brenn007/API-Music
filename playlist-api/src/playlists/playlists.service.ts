@@ -12,6 +12,7 @@ import { Song } from '../songs/entities/song.entity';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { User } from '../users/entities/user.entity';
+import { UserRole } from '../common/enums/user-role.enum';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 
@@ -102,10 +103,12 @@ export class PlaylistsService {
    * Récupérer une playlist par son ID avec toutes ses chansons
    * 
    * @param id - ID de la playlist
+   * @param user - Utilisateur qui effectue la requête (optionnel pour la vérification des droits)
    * @returns La playlist avec ses chansons
    * @throws NotFoundException si la playlist n'existe pas
+   * @throws ForbiddenException si la playlist est privée et que l'utilisateur n'est pas autorisé
    */
-  async findOne(id: number): Promise<Playlist> {
+  async findOne(id: number, user?: User): Promise<Playlist> {
     const playlist = await this.playlistRepository.findOne({
       where: { id },
       relations: ['user', 'playlistTracks', 'playlistTracks.song'],
@@ -120,6 +123,21 @@ export class PlaylistsService {
 
     if (!playlist) {
       throw new NotFoundException('Playlist non trouvée');
+    }
+
+    // Vérifier les droits d'accès
+    // Si la playlist est privée, seul le propriétaire ou un ADMIN peut la voir
+    if (!playlist.isPublic) {
+      if (!user) {
+        throw new ForbiddenException('Cette playlist est privée');
+      }
+
+      const isAdmin = user.role === UserRole.ADMIN;
+      if (playlist.userId !== user.id && !isAdmin) {
+        throw new ForbiddenException(
+          "Vous n'avez pas la permission d'accéder à cette playlist privée",
+        );
+      }
     }
 
     return playlist;
@@ -218,10 +236,18 @@ export class PlaylistsService {
       throw new BadRequestException('Cette chanson est déjà dans la playlist');
     }
 
+    // Calculer la position suivante (dernière position + 1)
+    const lastTrack = await this.playlistTrackRepository.findOne({
+      where: { playlistId },
+      order: { position: 'DESC' },
+    });
+    const position = lastTrack ? lastTrack.position + 1 : 1;
+
     // Créer la relation playlist-chanson
     const playlistTrack = this.playlistTrackRepository.create({
       playlistId,
       songId,
+      position,
     });
 
     return await this.playlistTrackRepository.save(playlistTrack);
@@ -257,6 +283,22 @@ export class PlaylistsService {
       throw new NotFoundException('Chanson non trouvée dans cette playlist');
     }
 
+    const removedPosition = playlistTrack.position;
+
     await this.playlistTrackRepository.remove(playlistTrack);
+
+    // Réorganiser les positions des chansons restantes
+    const remainingTracks = await this.playlistTrackRepository.find({
+      where: { playlistId },
+      order: { position: 'ASC' },
+    });
+
+    // Mettre à jour les positions si nécessaire
+    for (const track of remainingTracks) {
+      if (track.position > removedPosition) {
+        track.position -= 1;
+        await this.playlistTrackRepository.save(track);
+      }
+    }
   }
 }

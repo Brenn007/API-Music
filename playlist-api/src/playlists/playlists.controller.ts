@@ -43,9 +43,10 @@ export class PlaylistsController {
   @ApiOperation({ summary: 'Obtenir une playlist avec ses chansons' })
   @ApiResponse({ status: 200, description: 'Playlist trouvée' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Pas l\'autorisation d\'accéder à cette playlist' })
   @ApiResponse({ status: 404, description: 'Playlist introuvable' })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.playlistsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @GetUser() user: User) {
+    return this.playlistsService.findOne(id, user);
   }
 
   @Post()

@@ -104,7 +104,7 @@ describe('AuthService', () => {
       const result = await service.register(registerDto);
 
       expect(result).toHaveProperty('accessToken');
-      expect(result).not.toHaveProperty('refreshToken'); // Le refresh token n'est plus retourné
+      expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe(mockUser.email);
       expect(mockUserRepository.save).toHaveBeenCalled();
     });
@@ -157,7 +157,7 @@ describe('AuthService', () => {
       const result = await service.login(loginDto);
 
       expect(result).toHaveProperty('accessToken');
-      expect(result).not.toHaveProperty('refreshToken'); // Le refresh token n'est plus retourné
+      expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe(mockUser.email);
     });
 
@@ -199,22 +199,35 @@ describe('AuthService', () => {
   });
 
   describe('refreshTokens', () => {
-    it('devrait générer un nouvel access token', async () => {
-      mockJwtService.signAsync.mockResolvedValue('newAccessToken');
+    it('devrait générer un nouvel access token et refresh token', async () => {
+      mockJwtService.signAsync.mockResolvedValue('newToken');
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('newHashedToken');
 
-      const result = await service.refreshTokens(mockUser);
+      const result = await service.refreshTokens(mockUser, 'rawToken');
 
       expect(result).toHaveProperty('accessToken');
-      expect(result.accessToken).toBe('newAccessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result.accessToken).toBe('newToken');
+      expect(result.refreshToken).toBe('newToken');
     });
 
     it('devrait lancer UnauthorizedException si pas de refresh token stocké', async () => {
       const userWithoutToken = { ...mockUser, refreshToken: null };
 
-      await expect(service.refreshTokens(userWithoutToken)).rejects.toThrow(
+      await expect(service.refreshTokens(userWithoutToken, 'rawToken')).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(service.refreshTokens(userWithoutToken)).rejects.toThrow('Session invalide');
+      await expect(service.refreshTokens(userWithoutToken, 'rawToken')).rejects.toThrow('Session invalide');
+    });
+
+    it('devrait lancer UnauthorizedException si le token ne correspond pas', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.refreshTokens(mockUser, 'wrongToken')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.refreshTokens(mockUser, 'wrongToken')).rejects.toThrow('Refresh token invalide');
     });
   });
 });

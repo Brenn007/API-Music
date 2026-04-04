@@ -30,18 +30,24 @@ export class JwtRefreshStrategy extends PassportStrategy(
       ignoreExpiration: false,
       //secret pour verifier la signature du refresh token (different de l'access token)
       secretOrKey: configService.get<string>('JWT_REFRESH_SECRET'),
+      // passer la requete au callback validate pour extraire le token brut
+      passReqToCallback: true,
     });
   }
 
   /**
    * valide le payload du refresh token et retourne l'utilisateur
    * 
+   * @param req - La requête Express
    * @param payload - Payload extrait du refresh token JWT
-   * @returns L'utilisateur authentifié
+   * @returns L'utilisateur authentifié avec le refresh token brut attaché
    * @throws UnauthorizedException si l'utilisateur n'existe pas ou est banni
    */
-  async validate(payload: JwtPayload): Promise<User> {
+  async validate(req: any, payload: JwtPayload): Promise<any> {
     const { sub: userId } = payload;
+
+    // extraire le refresh token brut du header
+    const refreshToken = req.get('Authorization').replace('Bearer', '').trim();
 
     //rcuperer l'utilisateur depuis la base de donnees
     const user = await this.userRepository.findOne({
@@ -65,7 +71,10 @@ export class JwtRefreshStrategy extends PassportStrategy(
       throw new UnauthorizedException('Session invalide');
     }
 
-    //retourner l'utilisateur (sera attache a request.user)
-    return user;
+    //retourner l'utilisateur avec le token brut (sera attache a request.user)
+    return {
+      ...user,
+      refreshTokenRaw: refreshToken,
+    };
   }
 }

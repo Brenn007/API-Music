@@ -78,6 +78,7 @@ export class AuthService {
     //retourner les tokens et les infos utilisateur (sans le password)
     return {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -127,6 +128,7 @@ export class AuthService {
     //retourner les tokens et les infos utilisateur (sans le password)
     return {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -154,19 +156,29 @@ export class AuthService {
    * rafraichir l'access token en utilisant un refresh token valide
    * 
    * @param user - Utilisateur authentifié via le refresh token
-   * @returns Un nouvel access token
+   * @param refreshToken - Le refresh token brut fourni dans la requête
+   * @returns Un nouvel access token et un nouveau refresh token
    * @throws UnauthorizedException si le refresh token est invalide
    */
-  async refreshTokens(user: User) {
+  async refreshTokens(user: User, refreshToken: string) {
     //verifier que l'utilisateur a un refresh token stocke
     if (!user.refreshToken) {
       throw new UnauthorizedException('Session invalide');
     }
 
-    //generer un nouvel access token
-    const accessToken = await this.generateAccessToken(user);
+    // vérifier que le refresh token correspond à celui stocké (haché)
+    const isTokenMatching = await bcrypt.compare(refreshToken, user.refreshToken);
+    if (!isTokenMatching) {
+      throw new UnauthorizedException('Refresh token invalide');
+    }
 
-    return { accessToken };
+    //generer une nouvelle paire de tokens (rotation)
+    const tokens = await this.generateTokens(user);
+
+    // mettre à jour le refresh token dans la base de données
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+    return tokens;
   }
 
   /**
